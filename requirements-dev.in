@@ -1,0 +1,9 @@
+-r requirements.in
+
+black
+mypy
+pytest
+pytest-cov
+Sphinx
+tox
+wemake-python-styleguide
