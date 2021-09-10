@@ -17,36 +17,47 @@ NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FO
 DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
-from types import ModuleType
-import pkgutil
-import importlib
 import argparse
+import importlib
+import pkgutil
+from types import ModuleType
 
 
-def load_modules(package_name: str) -> list[ModuleType]:
+def _load_modules(package_name: str) -> list[ModuleType]:
     package = importlib.import_module(package_name)
     modules = [package]
-    for _, modname, __ in pkgutil.walk_packages(path=package.__path__,
-                                                        prefix=package.__name__+'.',
-                                                        onerror=lambda x: None):
+
+    path = package.__path__  # type: ignore # noqa: WPS609
+    name = f"{package.__name__}."
+
+    for _, modname, _ in pkgutil.walk_packages(path, name, onerror=lambda err: None):
         modules.append(importlib.import_module(modname))
     return modules
 
 
-def check_modules_for_license(modules: list[ModuleType], license: str) -> None:
+def _check_modules_for_license(modules: list[ModuleType], license: str) -> None:
     for module in modules:
         assert module.__doc__, f"Module {module.__name__} has no or empty documentation string"
-        assert license in module.__doc__, f"Module {module.__name__} does not have the correct copyright notice"
+        assert (
+            license in module.__doc__
+        ), f"Module {module.__name__} does not have the correct copyright notice"
 
 
-def check_licenses(license_file, package_name) -> None:
-    """This tool checks all modules of a python package for license headers."""
-    modules = load_modules(package_name)
-    license = open(license_file, 'r').read()
-    check_modules_for_license(modules, license)
+def check_licenses(license_file: str, package_name: str) -> None:
+    """Check all modules of a python package for license headers.
+
+    Args:
+        license_file (str): A file containing the license header.
+        package_name (str): The package that should be checked.
+    """
+    modules = _load_modules(package_name)
+    with open(license_file, "r") as license_file_handler:
+        license = license_file_handler.read()
+    _check_modules_for_license(modules, license)
 
 
-def main():
+def main() -> None:
+    """License header check main that handles arg parsing."""
     parser = argparse.ArgumentParser()
     parser.add_argument("license_file")
     parser.add_argument("package_name")
