@@ -46,9 +46,13 @@ def check_licenses(license_file, package_name) -> None:
     check_modules_for_license(modules, license)
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("license_file")
     parser.add_argument("package_name")
     args = parser.parse_args()
     check_licenses(args.license_file, args.package_name)
+
+
+if __name__ == "__main__":
+    main()
