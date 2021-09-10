@@ -20,6 +20,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SO
 import argparse
 import importlib
 import pkgutil
+import sys
+from importlib.util import find_spec
+from pathlib import Path
 from types import ModuleType
 
 
@@ -27,33 +30,51 @@ def _load_modules(package_name: str) -> list[ModuleType]:
     package = importlib.import_module(package_name)
     modules = [package]
 
-    path = package.__path__  # type: ignore # noqa: WPS609
-    name = f"{package.__name__}."
+    # Only walk the package, if it actually is a package not a module
+    package_path = getattr(package, "__path__", None)
+    if package_path:
+        name = f"{package.__name__}."
 
-    for _, modname, _ in pkgutil.walk_packages(path, name, onerror=lambda err: None):
-        modules.append(importlib.import_module(modname))
+        for _, modname, _ in pkgutil.walk_packages(package_path, name, onerror=lambda err: None):
+            modules.append(importlib.import_module(modname))
+
     return modules
 
 
-def _check_modules_for_license(modules: list[ModuleType], license: str) -> None:
+def _check_modules_for_license(modules: list[ModuleType], license: str) -> bool:
+    prestine = True
     for module in modules:
-        assert module.__doc__, f"Module {module.__name__} has no or empty documentation string"
-        assert (
-            license in module.__doc__
-        ), f"Module {module.__name__} does not have the correct copyright notice"
+        if not module.__doc__:
+            print(f"Module {module.__name__} has no or empty documentation string")
+            prestine = False
+        elif license not in module.__doc__:
+            print(f"Module {module.__name__} does not have the correct copyright notice")
+            prestine = False
+    return prestine
 
 
-def check_licenses(license_file: str, package_name: str) -> None:
+def check_licenses(license_file: Path, package_name: str) -> tuple[bool, int]:
     """Check all modules of a python package for license headers.
 
     Args:
-        license_file (str): A file containing the license header.
+        license_file (Path): A file containing the license header.
         package_name (str): The package that should be checked.
+
+    Returns:
+        tuple[bool, int]: the bool indicates, if any checks failed,
+                          the int gives the number of checked modules
     """
+    if not license_file.is_file():
+        _print_fail("Given license_file is not a file")
+    if not find_spec(package_name):
+        _print_fail("Given package_name is not a valid module")
+    license = license_file.read_text().strip()
     modules = _load_modules(package_name)
-    with open(license_file, "r") as license_file_handler:
-        license = license_file_handler.read()
-    _check_modules_for_license(modules, license)
+    return _check_modules_for_license(modules, license), len(modules)
+
+
+def _print_fail(msg: str) -> None:
+    sys.exit(msg)
 
 
 def main() -> None:
@@ -62,7 +83,12 @@ def main() -> None:
     parser.add_argument("license_file")
     parser.add_argument("package_name")
     args = parser.parse_args()
-    check_licenses(args.license_file, args.package_name)
+    license_file = Path(args.license_file)
+    prestine, count = check_licenses(license_file, args.package_name)
+    if prestine:
+        print(f"Checked {count} modules, all good!")
+    else:
+        _print_fail(f"Checked {count} modules, but some errors occured.")
 
 
 if __name__ == "__main__":
