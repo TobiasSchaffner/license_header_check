@@ -29,9 +29,7 @@ certifi==2021.5.30
 charset-normalizer==2.0.4
     # via requests
 click==8.0.1
-    # via
-    #   -r requirements.in
-    #   black
+    # via black
 coverage==5.5
     # via pytest-cov
 darglint==1.8.0
