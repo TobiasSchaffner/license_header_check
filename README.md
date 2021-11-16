@@ -23,5 +23,8 @@ Optional:
 
 ```bash
 license-header-check LICENSE my_package
+```
+
+```bash
 license-header-check LICENSE my_package --ignore my_package.my_subpackage
 ```
