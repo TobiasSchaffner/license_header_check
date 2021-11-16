@@ -26,7 +26,7 @@ from pathlib import Path
 from types import ModuleType
 
 
-def _load_modules(package_name: str) -> list[ModuleType]:
+def _load_modules(package_name: str, ignore: str) -> list[ModuleType]:
     package = importlib.import_module(package_name)
     modules = [package]
 
@@ -34,9 +34,9 @@ def _load_modules(package_name: str) -> list[ModuleType]:
     package_path = getattr(package, "__path__", None)
     if package_path:
         name = f"{package.__name__}."
-
         for _, modname, _ in pkgutil.walk_packages(package_path, name, onerror=lambda err: None):
-            modules.append(importlib.import_module(modname))
+            if not ignore or not modname.startswith(ignore):
+                modules.append(importlib.import_module(modname))
 
     return modules
 
@@ -53,12 +53,13 @@ def _check_modules_for_license(modules: list[ModuleType], license: str) -> bool:
     return prestine
 
 
-def check_licenses(license_file: Path, package_name: str) -> tuple[bool, int]:
+def check_licenses(license_file: Path, package_name: str, ignore: str = "") -> tuple[bool, int]:
     """Check all modules of a python package for license headers.
 
     Args:
         license_file (Path): A file containing the license header.
         package_name (str): The package that should be checked.
+        ignore (str): A path in the package that should be ignored.
 
     Returns:
         tuple[bool, int]: the bool indicates, if any checks failed,
@@ -69,7 +70,7 @@ def check_licenses(license_file: Path, package_name: str) -> tuple[bool, int]:
     if not find_spec(package_name):
         _print_fail("Given package_name is not a valid module")
     license = license_file.read_text().strip()
-    modules = _load_modules(package_name)
+    modules = _load_modules(package_name, ignore)
     return _check_modules_for_license(modules, license), len(modules)
 
 
@@ -82,9 +83,9 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("license_file")
     parser.add_argument("package_name")
+    parser.add_argument("--ignore", default="")
     args = parser.parse_args()
-    license_file = Path(args.license_file)
-    prestine, count = check_licenses(license_file, args.package_name)
+    prestine, count = check_licenses(Path(args.license_file), args.package_name, args.ignore)
     if prestine:
         print(f"Checked {count} modules, all good!")
     else:
